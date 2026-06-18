@@ -10,6 +10,7 @@ remote_launch.log
 .github_sync_manifest.json
 고객용 파일.zip
 고객용 파일/
+고객용*.zip
 sync/client.zip
 OpenAPI_backup/
 KOAStudioSA_ATS_ver*/
