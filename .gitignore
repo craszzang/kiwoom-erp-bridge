@@ -1,0 +1,18 @@
+.venv32/
+.venv-remote/
+__pycache__/
+*.pyc
+*.pyo
+.Python
+config.yaml
+remote_launch.log
+.bridge_sync_manifest.json
+.github_sync_manifest.json
+고객용 파일.zip
+고객용 파일/
+sync/client.zip
+OpenAPI_backup/
+KOAStudioSA_ATS_ver*/
+*.log
+*.dll
+*.exe

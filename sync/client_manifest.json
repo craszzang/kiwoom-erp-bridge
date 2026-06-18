@@ -1,0 +1,94 @@
+{
+  "bridge_version": "1.0.0",
+  "bundle_version": "b6ebe8ba994d",
+  "files": {
+    "auto_trader/__init__.py": {
+      "sha256": "a80cad6f3561d1b1313171324c91c59ae8bc3aa824b1702bad1f909d0f206332",
+      "size": 35
+    },
+    "auto_trader/bridge_protocol.py": {
+      "sha256": "73c3807c9327b88087ea87a0dc270ca65649398ec26ee432c709c950d4e4b673",
+      "size": 474
+    },
+    "auto_trader/bridge_server.py": {
+      "sha256": "1a45b13c80f986a72187f02461b0fe714a18ecf389100b81dd19676a9164c62c",
+      "size": 16258
+    },
+    "auto_trader/condition_picker.py": {
+      "sha256": "1c4ca410661075ff8e3165fe02e022675e94a8d8ce1d3dbfeb0fa2d07a3a6354",
+      "size": 2814
+    },
+    "auto_trader/config.py": {
+      "sha256": "abb63d2bacc5176b3d1096d6d4b81d38035a46257cdc2148a6b5e80860ed6a50",
+      "size": 8004
+    },
+    "auto_trader/excel_main.py": {
+      "sha256": "bfd76cb48c17166339401267a8895833354c7c117388962e8059857de196e01a",
+      "size": 608
+    },
+    "auto_trader/excel_ui.py": {
+      "sha256": "ee3a3cd5368a2aceeaf12b0ecc580732f7ab0a6e9f78fa96164b3b7dcee7bc8a",
+      "size": 38465
+    },
+    "auto_trader/filter_dialog.py": {
+      "sha256": "4930b99cc361adefce4ba9770360f17a3179096919016a4600eb0392f59cfdb4",
+      "size": 2041
+    },
+    "auto_trader/github_sync.py": {
+      "sha256": "41718a7047b8dd10f0fca3ddae8695da6e751b904c7b059c7c708ca6a3f6cd4d",
+      "size": 6049
+    },
+    "auto_trader/i18n_ko.py": {
+      "sha256": "9c3f9b7eb51f175ebc40368f0d5f30e0dea7e9fd73812d73cdb148f919d16efa",
+      "size": 15535
+    },
+    "auto_trader/kiwoom_api.py": {
+      "sha256": "da8a6762bcd634cee8e37f1a89a2dc7fb08592e90147677dc370f67a2a12bf86",
+      "size": 17435
+    },
+    "auto_trader/main.py": {
+      "sha256": "dec05a4bcf7231d341dc04adf7d15e44fe88093da5c1ac031d2b24a6da47d90f",
+      "size": 2622
+    },
+    "auto_trader/positions.py": {
+      "sha256": "15f51ce2fc494e483656b7c80beea23784244ec13942bf7faff41a44fd8a865b",
+      "size": 1773
+    },
+    "auto_trader/qt_fix.py": {
+      "sha256": "a64832b87cc17faebcbe108ff70a5a693274b76a63bde0a43a76852568e8b6e0",
+      "size": 841
+    },
+    "auto_trader/remote_client.py": {
+      "sha256": "9d5c042f97a3c03e29c9727f91d857e2f6c12686e2f73f380035ce05937ef133",
+      "size": 10196
+    },
+    "auto_trader/remote_main.py": {
+      "sha256": "025b585c78baa6b62d4214fe261dfec68691c6853909908d5ae213542cde4934",
+      "size": 5144
+    },
+    "auto_trader/remote_scanner.py": {
+      "sha256": "886e17c77b6ca4842880029c36ec5f5daebde46189bda1d51714bb7e9da83035",
+      "size": 3435
+    },
+    "auto_trader/remote_startup.py": {
+      "sha256": "fbb78de520ebceae787ce887e787e10436c19962ede36f65e49aeb9b439179ae",
+      "size": 1165
+    },
+    "auto_trader/remote_sync.py": {
+      "sha256": "a211f946d0a9405dddd4fd655d78beb5ffd11b50f86dee95163d1f7d33412a7a",
+      "size": 3461
+    },
+    "auto_trader/stock_scanner.py": {
+      "sha256": "5109ecd045a1926b471e2ed75a003bea786b239a91bd5301dcb3d1fa2db18975",
+      "size": 16703
+    },
+    "auto_trader/strategy.py": {
+      "sha256": "5525dedaf50ab1bea9df247fbd261bedf69c9b90d4b4ee46fa3b6b7912bb37c2",
+      "size": 5297
+    },
+    "config.yaml.example": {
+      "sha256": "b99849aa8390685c33aa8c1ea9a388b38472ed450ce5037acae8016c616de183",
+      "size": 559
+    }
+  }
+}

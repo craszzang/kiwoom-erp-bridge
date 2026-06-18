@@ -1,0 +1,32 @@
+use_mock: true
+mock_mode: catch
+account_no: ""
+
+mock:
+  mode: catch
+  account_no: ""
+  user_id: ""
+
+real:
+  account_no: ""
+
+screen_no: "0101"
+real_screen_no: "0102"
+
+# market = �ڽ���+�ڽ��� ������ / watch_codes = �Ʒ� ��ϸ�
+watch_mode: market
+watch_codes:
+  - "005930"
+
+condition_name: ""
+condition_index: 0
+max_positions: 3
+order_qty: 1
+buy_drop_pct: 1.0
+sell_rise_pct: 1.5
+log_level: INFO
+
+filters:
+  min_sell_balance_pct: 50.0
+  min_execution_strength: 100.0
+  filter_pass_only: false

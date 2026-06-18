@@ -1,0 +1,4 @@
+PyQt5==5.15.11
+PyYAML==6.0.2
+requests==2.32.3
+websockets==13.1

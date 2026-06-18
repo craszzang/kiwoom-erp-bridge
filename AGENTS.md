@@ -1,0 +1,25 @@
+# Ű�� �ڵ��Ÿ� (KK)
+
+## ȯ��
+
+- OpenAPI: `C:\OpenAPI` (32��Ʈ COM, `khopenapi.ocx`)
+- Python: **32��Ʈ��** ? `.venv32` ����ȯ�� (`setup_env.bat`)
+- 64��Ʈ Python(3.12, 3.14)���δ� OCX �ε� �Ұ�
+
+## ����
+
+1. `setup_env.bat` ? ���� 1ȸ
+2. `config.yaml` ����
+3. `run.bat test` ? ���� �׽�Ʈ
+4. `run.bat` ? �ڵ��Ÿ�
+
+## �ڵ� ����
+
+- `auto_trader/kiwoom_api.py` ? OpenAPI ����
+- `auto_trader/strategy.py` ? ���� (���� ����)
+- `auto_trader/main.py` ? ������
+
+## ��Ģ
+
+- �ֹ�/���� �� �������� �ʼ�
+- ����������ũ ������ ����� å�� ? ���� ������ ������

@@ -1,0 +1,44 @@
+name: Client release
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "auto_trader/**"
+      - "scripts/**"
+      - "requirements-remote.txt"
+      - "setup_remote.*"
+      - "_paths_remote.bat"
+      - "재고실적_집계-원격*.bat"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build manifest and client zip
+        run: |
+          pip install pyyaml
+          python scripts/build_sync_manifest.py
+          python scripts/make_client_zip.py
+          mkdir -p sync
+          cp "고객용 파일.zip" sync/client.zip
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: client-${{ github.run_number }}
+          name: Client bundle ${{ github.run_number }}
+          files: |
+            sync/client.zip
+            sync/client_manifest.json
+          generate_release_notes: true
