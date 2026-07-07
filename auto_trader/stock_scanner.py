@@ -21,7 +21,8 @@ FID_CHANGE_RATE = 12
 FID_SELL_TOTAL = 121
 FID_BUY_TOTAL = 125
 FID_EXEC_STRENGTH = 228
-REAL_FIDS = "10;11;12;121;125;228"
+FID_CUM_VOLUME = 13
+REAL_FIDS = "10;11;12;13;121;125;228"
 LITE_ROW_THRESHOLD = 80
 NAME_BATCH_SIZE = 40
 FilterState = Literal["wait", "pass", "fail"]
@@ -37,6 +38,7 @@ class StockQuote:
     sell_total: int = 0
     buy_total: int = 0
     execution_strength: float = 0.0
+    cum_volume: int = 0
 
     @property
     def sell_balance_pct(self) -> float:
@@ -404,6 +406,9 @@ class ConditionStockScanner:
                     q.execution_strength = float(strength)
                 except ValueError:
                     pass
+            vol = self._parse_price(self.api.get_comm_real_data(code, FID_CUM_VOLUME))
+            if vol:
+                q.cum_volume = int(vol)
         if real_type == T.REAL_HOGA or "\ud638\uac00" in real_type:
             sell = self._parse_price(self.api.get_comm_real_data(code, FID_SELL_TOTAL))
             buy = self._parse_price(self.api.get_comm_real_data(code, FID_BUY_TOTAL))

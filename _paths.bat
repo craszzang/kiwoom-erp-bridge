@@ -2,7 +2,8 @@
 REM Common paths (quoted for username with & character)
 set "KK_ROOT=%~dp0"
 for %%I in ("%LOCALAPPDATA%") do set "LOCAL_SHORT=%%~sI"
-set "PY=%LOCAL_SHORT%\kiwoom-trader\.venv32\Scripts\python.exe"
+set "PY=%KK_ROOT%.venv32\Scripts\python.exe"
+if not exist "%PY%" set "PY=%LOCAL_SHORT%\kiwoom-trader\.venv32\Scripts\python.exe"
 set "QT_BASE=%LOCAL_SHORT%\kiwoom-trader\.venv32\Lib\site-packages\PyQt5\Qt5"
 set "QT_QPA_PLATFORM_PLUGIN_PATH=%QT_BASE%\plugins\platforms"
 set "QT_PLUGIN_PATH=%QT_BASE%\plugins"

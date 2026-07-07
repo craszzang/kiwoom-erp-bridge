@@ -1,0 +1,29 @@
+name: CI tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install pyyaml
+
+      - name: Backtest 5m unit tests
+        run: python tests/test_backtest_5m.py
+
+      - name: BRM engine unit tests
+        run: python tests/test_brm_engine.py
+
+      - name: Strategy optimizer tests
+        run: python tests/test_strategy_optimizer.py

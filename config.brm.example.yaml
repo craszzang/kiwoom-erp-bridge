@@ -1,0 +1,37 @@
+filters:
+  min_sell_balance_pct: 50.0
+  min_execution_strength: 100.0
+  filter_pass_only: false
+
+# BRM v3 단타 모의 (09:00~11:00 강제청산, 실주문 없음)
+brm:
+  enabled: false
+  paper_only: true
+  session_start: "09:00"
+  session_end: "11:00"
+  entry_cutoff: "10:30"
+  low_depth: 3
+  low_offset: 6
+  rsi_entry_max: 65
+  rsi_add_max: 50
+  martin_trigger_pct: 0.2
+  add_limit_pct: 3.0
+  martin_ratio: 1.0
+  max_entries: 4
+  base_qty: 1
+  tp_pct: 1.5
+  tp_min_profit_pct: 0.5
+  rsi_exit_min: 70
+  stop_loss_pct: 5.0
+  rsi_period: 14
+  bb_length: 200
+  bb_mult: 1.5
+  macd_fast: 6
+  macd_slow: 12
+  macd_signal: 5
+  min_session_volume: 0
+  require_volume_surge: false
+  volume_surge_ratio: 1.5
+  bar_minutes: 1
+  max_symbols: 40
+  log_signals: true

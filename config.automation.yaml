@@ -1,0 +1,68 @@
+use_mock: true
+mock_mode: catch
+account_no: ""
+
+mock:
+  mode: catch
+  account_no: ""
+  user_id: ""
+
+real:
+  account_no: ""
+
+screen_no: "0101"
+real_screen_no: "0102"
+tr_screen_no: "0103"
+brm_tr_screen_no: "0104"
+condition_screen_no: "0150"
+
+watch_mode: market
+watch_codes: []
+condition_name: ""
+condition_index: 0
+log_level: INFO
+
+filters:
+  min_sell_balance_pct: 50.0
+  min_execution_strength: 100.0
+  filter_pass_only: true
+
+brm:
+  enabled: true
+  paper_only: true
+  session_start: "09:00"
+  session_end: "11:00"
+  entry_cutoff: "10:30"
+  martin_trigger_pct: 0.2
+  add_limit_pct: 3.0
+  stop_loss_pct: 5.0
+  tp_pct: 1.5
+  max_symbols: 40
+  log_signals: true
+
+# 완전 자동 — 클릭 없음 (PC 로그인·키움 자동로그인만 1회 설정)
+automation:
+  enabled: true
+  auto_connect_on_start: true
+  silent: true
+  minimize_window: true
+  skip_condition_dialog: true
+  condition_names: []
+  condition_indices: []
+  use_first_condition: true
+  auto_brm: true
+  session_start: "08:50"
+  session_end: "11:05"
+  quit_after_session: true
+  login_retry_count: 10
+  login_retry_sec: 20
+  refresh_conditions_min: 5
+  skip_account_password_dialog: true
+
+strategy_auto:
+  enabled: true
+  auto_evolve: true
+
+bridge:
+  role: host
+  auto_sync: false

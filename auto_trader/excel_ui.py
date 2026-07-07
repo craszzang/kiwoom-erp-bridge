@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+import logging
 import threading
-from datetime import datetime
+from datetime import datetime, time as dt_time
+
+from pathlib import Path
 
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QColor, QFont, QKeySequence
@@ -31,6 +34,11 @@ from PyQt5.QtWidgets import (
 )
 
 from auto_trader import i18n_ko as T
+from auto_trader.auto_conditions import resolve_conditions
+from auto_trader.auto_log import setup_auto_logging
+from auto_trader.auto_loop import finalize_session, prepare_session
+from auto_trader.brm_runner import BrmPaperRunner
+from auto_trader.daily_runner import DailyRunner
 from auto_trader.condition_picker import ConditionChoice, pick_conditions
 from auto_trader.config import TraderConfig, load_config, save_config
 from auto_trader.filter_dialog import edit_filters
@@ -40,6 +48,8 @@ from auto_trader.stock_scanner import ConditionStockScanner, StockQuote
 
 if False:  # TYPE_CHECKING
     from auto_trader.remote_client import RemoteBridgeClient
+
+logger = logging.getLogger(__name__)
 
 DATA_START_ROW = 4
 HEADER_ROW = 3
@@ -74,11 +84,18 @@ def pnl_color(value: float) -> QColor:
 
 
 class ExcelDisguiseWindow(QMainWindow):
-    def __init__(self, config: TraderConfig, bridge: "RemoteBridgeClient | None" = None) -> None:
+    def __init__(
+        self,
+        config: TraderConfig,
+        bridge: "RemoteBridgeClient | None" = None,
+        *,
+        auto_mode: bool = False,
+    ) -> None:
         super().__init__()
         self.api: KiwoomAPI | None = None
         self.config = config
         self._bridge = bridge
+        self._auto_mode = auto_mode or config.automation.enabled
         self._remote_mode = bridge is not None or config.bridge_role == "client"
         self.scanner: ConditionStockScanner | None = None
         self.positions = PositionBook()
@@ -92,6 +109,25 @@ class ExcelDisguiseWindow(QMainWindow):
         self._grid_refresh_timer.setSingleShot(True)
         self._grid_refresh_timer.setInterval(120)
         self._grid_refresh_timer.timeout.connect(self._apply_scanner_update)
+        self._brm_runner: BrmPaperRunner | None = None
+        self._daily_runner: DailyRunner | None = None
+        self._auto_log_path: Path | None = None
+        self._session_timer = QTimer(self)
+        self._session_timer.setInterval(30_000)
+        self._session_timer.timeout.connect(self._on_session_tick)
+        self._refresh_timer = QTimer(self)
+        self._refresh_timer.timeout.connect(self._auto_refresh_conditions)
+
+        if self._auto_mode:
+            self._auto_log_path = setup_auto_logging(self.config.log_level)
+            logger.info("automation ON log=%s", self._auto_log_path)
+            self.config.automation.enabled = True
+            if self.config.automation.auto_brm and not self.config.daily.enabled:
+                self.config.brm.enabled = True
+            if getattr(self.config.strategy_auto, "enabled", True):
+                rev_id = prepare_session(self.config)
+                save_config(self.config)
+                logger.info("strategy loaded: %s", rev_id)
 
         self.setWindowTitle(T.WIN_TITLE)
         self.resize(1680, 800)
@@ -103,7 +139,10 @@ class ExcelDisguiseWindow(QMainWindow):
 
         sync_shortcut = QShortcut(QKeySequence("F5"), self)
         sync_shortcut.activated.connect(self._start_sync)
-        QTimer.singleShot(500, self._prompt_connect)
+        if self._auto_mode:
+            QTimer.singleShot(1200, self._auto_start_sequence)
+        else:
+            QTimer.singleShot(500, self._prompt_connect)
 
     def _build_ui(self) -> None:
         central = QWidget()
@@ -212,8 +251,79 @@ class ExcelDisguiseWindow(QMainWindow):
         apply_btn = QPushButton(T.BTN_FILTER_APPLY)
         apply_btn.clicked.connect(self._apply_filter_bar)
         lay.addWidget(apply_btn)
+
+        lay.addSpacing(12)
+        self._brm_chk = QCheckBox(T.LBL_BRM_PAPER)
+        self._brm_chk.setChecked(self.config.brm.enabled)
+        self._brm_chk.stateChanged.connect(self._on_brm_toggle)
+        lay.addWidget(self._brm_chk)
+
         lay.addStretch()
         return bar
+
+    def _trading_runner(self) -> BrmPaperRunner | DailyRunner | None:
+        if self.config.daily.enabled:
+            return self._daily_runner
+        return self._brm_runner
+
+    def _ensure_daily_runner(self) -> DailyRunner | None:
+        if not self.api or not self.scanner or self._remote_mode:
+            return None
+        if self._daily_runner is None:
+            self.config.daily.min_sell_balance_pct = self.config.min_sell_balance_pct
+            self.config.daily.min_execution_strength = self.config.min_execution_strength
+            self._daily_runner = DailyRunner(
+                api=self.api,
+                config=self.config,
+                scanner=self.scanner,
+                params=self.config.daily,
+                on_update=self._on_trading_status,
+            )
+        return self._daily_runner
+
+    def _ensure_brm_runner(self) -> BrmPaperRunner | None:
+        if not self.api or not self.scanner or self._remote_mode:
+            return None
+        if self._brm_runner is None:
+            self.config.brm.min_sell_balance_pct = self.config.min_sell_balance_pct
+            self.config.brm.min_execution_strength = self.config.min_execution_strength
+            self.config.brm.paper_only = True
+            self._brm_runner = BrmPaperRunner(
+                api=self.api,
+                config=self.config,
+                scanner=self.scanner,
+                params=self.config.brm,
+                on_update=self._on_trading_status,
+            )
+        return self._brm_runner
+
+    def _on_trading_status(self) -> None:
+        runner = self._trading_runner()
+        if runner and runner.active:
+            self._status.showMessage(runner.status_text(), 8000)
+
+    def _on_brm_toggle(self, state: int) -> None:
+        enabled = state != 0
+        self.config.brm.enabled = enabled
+        save_config(self.config)
+        if not enabled:
+            if self._brm_runner:
+                self._brm_runner.stop()
+            self._status.showMessage(T.MSG_BRM_STOPPED, 4000)
+            return
+        if not self._connected or not self.scanner:
+            QMessageBox.information(self, T.MSG_ERP_TITLE, T.MSG_CONN_FIRST)
+            self._brm_chk.blockSignals(True)
+            self._brm_chk.setChecked(False)
+            self._brm_chk.blockSignals(False)
+            return
+        runner = self._ensure_brm_runner()
+        if runner:
+            runner.start()
+            self._status.showMessage(T.MSG_BRM_STARTED, 6000)
+
+    def _on_brm_status(self) -> None:
+        self._on_trading_status()
 
     def _apply_filter_bar(self) -> None:
         self.config.min_sell_balance_pct = self._sell_spin.value()
@@ -724,6 +834,104 @@ class ExcelDisguiseWindow(QMainWindow):
         if row is not None and quote:
             self._update_pnl_cells(row, code, quote.price)
 
+    def _parse_time_hm(self, text: str, default: tuple[int, int]) -> dt_time:
+        raw = str(text).strip()
+        if ":" in raw:
+            h, m = raw.split(":", 1)
+            return dt_time(int(h), int(m))
+        return dt_time(default[0], default[1])
+
+    def _auto_start_sequence(self) -> None:
+        if self._connected:
+            return
+        auto = self.config.automation
+        if auto.minimize_window:
+            self.showMinimized()
+        self._brm_chk.setChecked(self.config.brm.enabled)
+        self._session_timer.start()
+        start_t = self._parse_time_hm(auto.session_start, (8, 50))
+        if datetime.now().time() < start_t:
+            self._status.showMessage(f"Auto: {auto.session_start} 대기", 0)
+            QTimer.singleShot(20_000, self._auto_start_sequence)
+            return
+        logger.info("auto connect start")
+        self._connect_and_run()
+
+    def _on_session_tick(self) -> None:
+        auto = self.config.automation
+        if self.config.daily.enabled:
+            end_t = self.config.daily.t_force_flat
+        else:
+            end_t = self._parse_time_hm(auto.session_end, (11, 5))
+        if datetime.now().time() >= end_t:
+            logger.info("session end %s — exit", auto.session_end)
+            if self._trading_runner():
+                cond_names = [c.name for c in self._selected_conditions]
+                try:
+                    finalize_session(self.config, self._trading_runner(), cond_names)
+                except Exception as exc:
+                    logger.exception("finalize_session failed: %s", exc)
+                runner = self._trading_runner()
+                if runner:
+                    runner.stop()
+            if auto.quit_after_session:
+                QApplication.quit()
+
+    def _auto_refresh_conditions(self) -> None:
+        if not self._connected or not self.scanner or not self._selected_conditions:
+            return
+        try:
+            added = self.scanner.refresh_condition_snapshot()
+            if added:
+                logger.info("condition refresh +%d", added)
+            self.refresh_grid(full_rebuild=True)
+        except Exception as exc:
+            logger.warning("condition refresh failed: %s", exc)
+
+    def _start_trading_if_configured(self) -> None:
+        if self.config.daily.enabled:
+            runner = self._ensure_daily_runner()
+            if runner and not runner.active:
+                runner.start()
+                self._status.showMessage(runner.status_text(), 6000)
+            return
+        if not self.config.brm.enabled:
+            return
+        self._brm_chk.setChecked(True)
+        runner = self._ensure_brm_runner()
+        if runner and not runner.active:
+            runner.start()
+            self._status.showMessage(T.MSG_BRM_STARTED, 6000)
+
+    def _start_brm_if_configured(self) -> None:
+        self._start_trading_if_configured()
+
+    def _select_conditions(self) -> list[ConditionChoice]:
+        if not self.api:
+            return []
+        auto = self.config.automation
+        if self._auto_mode and auto.skip_condition_dialog:
+            selected = resolve_conditions(self.api, self.config)
+            if selected:
+                save_config(self.config)
+            return selected
+        selected = pick_conditions(self.api, self)
+        if selected is None:
+            return []
+        return selected
+
+    def _msg(self, level: str, title: str, body: str) -> None:
+        if self._auto_mode and self.config.automation.silent:
+            logger.log(getattr(logging, level.upper(), logging.INFO), "%s: %s", title, body)
+            self._status.showMessage(body[:120], 8000)
+            return
+        if level == "critical":
+            QMessageBox.critical(self, title, body)
+        elif level == "warning":
+            QMessageBox.warning(self, title, body)
+        else:
+            QMessageBox.information(self, title, body)
+
     def _prompt_connect(self) -> None:
         if self._connected:
             return
@@ -848,26 +1056,48 @@ class ExcelDisguiseWindow(QMainWindow):
         if self._remote_mode:
             self._connect_remote()
             return
-        if self.config.use_mock:
+        silent = self._auto_mode and self.config.automation.silent
+        if self.config.use_mock and not silent:
             QMessageBox.information(self, T.MSG_ERP_TITLE, T.MSG_ERP_BODY)
 
         if self.api is None:
             try:
                 self.api = KiwoomAPI()
             except RuntimeError as exc:
-                QMessageBox.critical(self, T.MSG_ERP_TITLE, str(exc))
+                self._msg("critical", T.MSG_ERP_TITLE, str(exc))
+                if self._auto_mode:
+                    QTimer.singleShot(60_000, self._auto_start_sequence)
                 return
 
-        err = self.api.comm_connect()
+        auto = self.config.automation
+        retries = auto.login_retry_count if self._auto_mode else 1
+        err = -1
+        for attempt in range(1, retries + 1):
+            err = self.api.comm_connect()
+            if self.api.is_connected():
+                logger.info("kiwoom login ok attempt=%d", attempt)
+                break
+            logger.warning("kiwoom login fail attempt=%d err=%s", attempt, err)
+            if attempt < retries:
+                from PyQt5.QtCore import QEventLoop
+
+                loop = QEventLoop()
+                QTimer.singleShot(auto.login_retry_sec * 1000, loop.quit)
+                loop.exec_()
+
         if err != 0 or not self.api.is_connected():
             detail = KiwoomAPI.login_error_text(err)
-            QMessageBox.warning(self, T.MSG_ERP_TITLE, T.MSG_CONN_FAIL_FMT.format(detail=detail))
+            self._msg("warning", T.MSG_ERP_TITLE, T.MSG_CONN_FAIL_FMT.format(detail=detail))
+            if self._auto_mode:
+                QTimer.singleShot(60_000, self._auto_start_sequence)
             return
 
         server = self.api.get_login_info("GetServerGubun")
         accounts = self.api.get_accounts()
         if self.config.use_mock and server != "1":
-            QMessageBox.warning(self, T.MSG_ERP_TITLE, T.MSG_NOT_MOCK)
+            self._msg("warning", T.MSG_ERP_TITLE, T.MSG_NOT_MOCK)
+            if self._auto_mode:
+                QTimer.singleShot(120_000, self._auto_start_sequence)
             return
 
         if accounts:
@@ -877,11 +1107,10 @@ class ExcelDisguiseWindow(QMainWindow):
             self.config.account_no = acc
             save_config(self.config)
 
-        self._prompt_account_password()
+        if not (self._auto_mode and auto.skip_account_password_dialog) and not silent:
+            self._prompt_account_password()
 
-        selected = pick_conditions(self.api, self)
-        if selected is None:
-            selected = []
+        selected = self._select_conditions()
         self._save_condition_choice(selected)
 
         self.api.register_chejan_callback(self._on_chejan)
@@ -895,6 +1124,9 @@ class ExcelDisguiseWindow(QMainWindow):
         self.refresh_grid(full_rebuild=True)
         self._show_bootstrap_status(selected)
         self._status.showMessage(T.MSG_LINK_OK, 5000)
+        self._start_brm_if_configured()
+        if self._auto_mode and auto.refresh_conditions_min > 0:
+            self._refresh_timer.start(auto.refresh_conditions_min * 60_000)
 
     def _connect_remote(self) -> None:
         from auto_trader.remote_client import RemoteBridgeClient
@@ -902,7 +1134,7 @@ class ExcelDisguiseWindow(QMainWindow):
         if self._bridge is None:
             host = self.config.bridge_host.strip()
             if not host:
-                QMessageBox.warning(self, T.MSG_ERP_TITLE, T.MSG_BRIDGE_HOST_EMPTY)
+                self._msg("warning", T.MSG_ERP_TITLE, T.MSG_BRIDGE_HOST_EMPTY)
                 return
             self._bridge = RemoteBridgeClient(
                 host=host,
@@ -917,7 +1149,9 @@ class ExcelDisguiseWindow(QMainWindow):
             return bridge.connect(timeout_sec=30.0, on_tick=on_tick)
 
         if not self._run_bg(T.PROGRESS_BRIDGE_CONNECT, connect_work):
-            QMessageBox.warning(self, T.MSG_ERP_TITLE, T.MSG_BRIDGE_CONN_FAIL)
+            self._msg("warning", T.MSG_ERP_TITLE, T.MSG_BRIDGE_CONN_FAIL)
+            if self._auto_mode:
+                QTimer.singleShot(60_000, self._auto_start_sequence)
             return
 
         self.api = bridge.create_api()
@@ -929,9 +1163,7 @@ class ExcelDisguiseWindow(QMainWindow):
                 self.config.mock_account_no = acc
             save_config(self.config)
 
-        selected = pick_conditions(self.api, self)
-        if selected is None:
-            selected = []
+        selected = self._select_conditions()
         self._save_condition_choice(selected)
 
         self.api.register_chejan_callback(self._on_chejan)
@@ -944,16 +1176,25 @@ class ExcelDisguiseWindow(QMainWindow):
             return True
 
         if not self._run_bg(T.PROGRESS_LOAD_DATA, bootstrap_work, cancellable=False):
+            if self._auto_mode:
+                QTimer.singleShot(60_000, self._auto_start_sequence)
             return
 
         self._connected = True
         self.refresh_grid(full_rebuild=True)
         self._show_bootstrap_status(selected)
         self._status.showMessage(T.MSG_BRIDGE_LINK_OK, 5000)
+        self._start_brm_if_configured()
 
 
-def run_excel_ui(config: TraderConfig | None = None, remote: bool = False) -> int:
+def run_excel_ui(
+    config: TraderConfig | None = None,
+    remote: bool = False,
+    *,
+    auto_mode: bool = False,
+) -> int:
     cfg = config or load_config()
+    auto_mode = auto_mode or cfg.automation.enabled
     bridge = None
     if remote or cfg.bridge_role == "client":
         from auto_trader.remote_client import RemoteBridgeClient
@@ -968,6 +1209,8 @@ def run_excel_ui(config: TraderConfig | None = None, remote: bool = False) -> in
             )
     app = QApplication.instance() or QApplication([])
     app.setStyle("Fusion")
-    win = ExcelDisguiseWindow(config=cfg, bridge=bridge)
+    win = ExcelDisguiseWindow(config=cfg, bridge=bridge, auto_mode=auto_mode)
     win.show()
+    if auto_mode and cfg.automation.minimize_window:
+        win.showMinimized()
     return app.exec_()

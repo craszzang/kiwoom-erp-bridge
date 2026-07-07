@@ -5,11 +5,18 @@ on:
     branches: [main, master]
     paths:
       - "auto_trader/**"
+      - "backtest_5m/**"
       - "scripts/**"
-      - "requirements-remote.txt"
+      - "tests/**"
+      - "strategies/**"
+      - "data/**"
+      - "requirements*.txt"
       - "setup_remote.*"
-      - "_paths_remote.bat"
-      - "재고실적_집계-원격*.bat"
+      - "setup_env.ps1"
+      - "_paths*.bat"
+      - "*.bat"
+      - "config*.yaml"
+      - "config*.example.yaml"
   workflow_dispatch:
 
 permissions:

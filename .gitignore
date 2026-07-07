@@ -5,6 +5,7 @@ __pycache__/
 *.pyo
 .Python
 config.yaml
+config.telegram.yaml
 remote_launch.log
 .bridge_sync_manifest.json
 .github_sync_manifest.json
@@ -15,5 +16,7 @@ sync/client.zip
 OpenAPI_backup/
 KOAStudioSA_ATS_ver*/
 *.log
+logs/
+.github_sync_manifest.json
 *.dll
 *.exe

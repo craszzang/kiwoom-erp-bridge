@@ -1,0 +1,35 @@
+{
+  "rev_id": "Rev.0",
+  "title": "캐치 당일매매 베이스라인",
+  "description": "조건식(캐치) + 매도잔량>매수 + 체결강도 진입. 고점 추적 매도·익절·손절·15:20 전량청산.",
+  "created_at": "2026-07-08",
+  "daily": {
+    "enabled": true,
+    "paper_only": true,
+    "session_start": "09:05",
+    "session_end": "15:20",
+    "entry_cutoff": "14:30",
+    "force_flat": "15:20",
+    "min_sell_balance_pct": 52.0,
+    "min_execution_strength": 110.0,
+    "exit_strength_below": 95.0,
+    "take_profit_pct": 2.0,
+    "stop_loss_pct": 2.5,
+    "trail_from_peak_pct": 0.6,
+    "min_profit_to_trail_pct": 0.35,
+    "max_positions": 3,
+    "base_qty": 1,
+    "max_symbols": 40,
+    "rsi_exit_high": 72.0,
+    "log_signals": true
+  },
+  "brm": { "enabled": false },
+  "filters": {
+    "min_sell_balance_pct": 52.0,
+    "min_execution_strength": 110.0,
+    "filter_pass_only": true
+  },
+  "condition_keywords": ["급등", "거래량", "돌파", "모멘텀", "체결"],
+  "changelog": "당일매매·고점추적 베이스라인(Rev.0)",
+  "parent_rev": ""
+}

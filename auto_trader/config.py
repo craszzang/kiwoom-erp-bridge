@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from auto_trader.brm_params import BrmParams
+from auto_trader.daily_params import DailyParams
 from auto_trader.i18n_ko import MOCK_LOGIN_HINT
 
 
@@ -17,6 +19,72 @@ def normalize_account_no(raw: str) -> str:
     if len(digits) == 8:
         return digits + "01"
     return digits
+
+
+@dataclass
+class StrategyAutoConfig:
+    """Autonomous strategy Rev loop (prepare / evolve / report)."""
+
+    enabled: bool = True
+    auto_evolve: bool = True
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> "StrategyAutoConfig":
+        if not raw:
+            return cls()
+        from dataclasses import fields
+
+        kwargs: dict[str, Any] = {}
+        valid = {f.name for f in fields(cls)}
+        for k, v in raw.items():
+            if k in valid:
+                kwargs[k] = v
+        return cls(**kwargs)
+
+    def to_dict(self) -> dict[str, Any]:
+        from dataclasses import fields
+
+        return {f.name: getattr(self, f.name) for f in fields(self)}
+
+
+@dataclass
+class AutomationConfig:
+    """Hands-free mode: connect, conditions, BRM, schedule — no UI clicks."""
+
+    enabled: bool = False
+    auto_connect_on_start: bool = True
+    silent: bool = True
+    minimize_window: bool = True
+    skip_condition_dialog: bool = True
+    condition_names: list[str] = field(default_factory=list)
+    condition_indices: list[int] = field(default_factory=list)
+    use_first_condition: bool = True
+    auto_brm: bool = True
+    session_start: str = "08:50"
+    session_end: str = "11:05"
+    quit_after_session: bool = True
+    login_retry_count: int = 8
+    login_retry_sec: int = 15
+    refresh_conditions_min: int = 5
+    skip_account_password_dialog: bool = True
+
+    @classmethod
+    def from_dict(cls, raw: dict[str, Any] | None) -> "AutomationConfig":
+        if not raw:
+            return cls()
+        from dataclasses import fields
+
+        kwargs: dict[str, Any] = {}
+        valid = {f.name for f in fields(cls)}
+        for k, v in raw.items():
+            if k in valid:
+                kwargs[k] = v
+        return cls(**kwargs)
+
+    def to_dict(self) -> dict[str, Any]:
+        from dataclasses import fields
+
+        return {f.name: getattr(self, f.name) for f in fields(self)}
 
 
 @dataclass
@@ -30,6 +98,7 @@ class TraderConfig:
     screen_no: str = "0101"
     real_screen_no: str = "0102"
     tr_screen_no: str = "0103"
+    brm_tr_screen_no: str = "0104"
     condition_screen_no: str = "0150"
     watch_mode: str = "market"
     watch_codes: list[str] = field(default_factory=list)
@@ -54,6 +123,10 @@ class TraderConfig:
     github_branch: str = "main"
     github_mode: str = "manifest"
     github_asset: str = "client.zip"
+    brm: BrmParams = field(default_factory=BrmParams)
+    daily: DailyParams = field(default_factory=DailyParams)
+    automation: AutomationConfig = field(default_factory=AutomationConfig)
+    strategy_auto: StrategyAutoConfig = field(default_factory=StrategyAutoConfig)
 
     @property
     def active_account_no(self) -> str:
@@ -128,6 +201,26 @@ def load_config(path: str | Path | None = None) -> TraderConfig:
         filter_pass_only=bool(filters.get("filter_pass_only", raw.get("filter_pass_only", False))),
     )
 
+    brm_raw = raw.get("brm") or {}
+    if isinstance(brm_raw, dict):
+        cfg.brm = BrmParams.from_dict(brm_raw)
+
+    daily_raw = raw.get("daily") or {}
+    if isinstance(daily_raw, dict):
+        cfg.daily = DailyParams.from_dict(daily_raw)
+
+    auto_raw = raw.get("automation") or {}
+    if isinstance(auto_raw, dict):
+        cfg.automation = AutomationConfig.from_dict(auto_raw)
+        if cfg.automation.enabled:
+            cfg.brm.enabled = cfg.brm.enabled or cfg.automation.auto_brm
+            if cfg.daily.enabled:
+                cfg.brm.enabled = False
+
+    strat_raw = raw.get("strategy_auto") or {}
+    if isinstance(strat_raw, dict):
+        cfg.strategy_auto = StrategyAutoConfig.from_dict(strat_raw)
+
     bridge = raw.get("bridge") or {}
     if isinstance(bridge, dict):
         cfg.bridge_role = str(bridge.get("role", cfg.bridge_role))
@@ -171,6 +264,10 @@ def save_config(config: TraderConfig, path: str | Path | None = None) -> Path:
         "min_execution_strength": config.min_execution_strength,
         "filter_pass_only": config.filter_pass_only,
     }
+    data["brm"] = config.brm.to_dict()
+    data["daily"] = config.daily.to_dict()
+    data["automation"] = config.automation.to_dict()
+    data["strategy_auto"] = config.strategy_auto.to_dict()
     data["bridge"] = {
         "role": config.bridge_role,
         "host": config.bridge_host,
@@ -190,6 +287,7 @@ def save_config(config: TraderConfig, path: str | Path | None = None) -> Path:
         ("screen_no", config.screen_no),
         ("real_screen_no", config.real_screen_no),
         ("tr_screen_no", config.tr_screen_no),
+        ("brm_tr_screen_no", config.brm_tr_screen_no),
         ("condition_screen_no", config.condition_screen_no),
         ("watch_mode", config.watch_mode),
         ("watch_codes", config.watch_codes),
