@@ -7,8 +7,6 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, time
 from typing import TYPE_CHECKING, Callable
 
-from PyQt5.QtCore import QTimer
-
 if TYPE_CHECKING:
     from auto_trader.kiwoom_api import KiwoomAPI
 
@@ -172,11 +170,15 @@ class MinuteBarLoader:
         return self._stores
 
     def enqueue(self, codes: list[str], on_done: Callable[[], None] | None = None) -> None:
+        from PyQt5.QtCore import QTimer
+
         self._queue = list(dict.fromkeys(codes))
         self._on_done = on_done
         QTimer.singleShot(0, self._step)
 
     def _step(self) -> None:
+        from PyQt5.QtCore import QTimer
+
         if not self._queue:
             if self._on_done:
                 self._on_done()
