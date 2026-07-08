@@ -39,6 +39,7 @@ class StockQuote:
     buy_total: int = 0
     execution_strength: float = 0.0
     cum_volume: int = 0
+    source_conditions: set[str] = field(default_factory=set)
 
     @property
     def sell_balance_pct(self) -> float:
@@ -78,6 +79,7 @@ class ConditionStockScanner:
     lite_rows: bool = False
     on_state_change: Callable[[], None] | None = None
     _active_conditions: list[tuple[str, ConditionChoice]] = field(default_factory=list)
+    _code_sources: dict[str, set[str]] = field(default_factory=dict)
     _realtime_registered: bool = False
     _tr_queue: list[str] = field(default_factory=list)
     _name_queue: list[str] = field(default_factory=list)
@@ -94,10 +96,28 @@ class ConditionStockScanner:
                 pass
         self._active_conditions.clear()
 
+    def _tag_codes(self, condition_name: str, codes: list[str]) -> None:
+        for code in codes:
+            nc = normalize_stock_code(code)
+            if not nc:
+                continue
+            self._code_sources.setdefault(nc, set()).add(condition_name)
+            q = self.quotes.get(nc)
+            if q is not None:
+                q.source_conditions.add(condition_name)
+
+    def codes_for_condition(self, condition_name: str) -> list[str]:
+        out: list[str] = []
+        for code, srcs in self._code_sources.items():
+            if condition_name in srcs and code in self.quotes:
+                out.append(code)
+        return out
+
     def bootstrap(self, conditions: list[ConditionChoice] | None = None) -> None:
         self._stop_conditions()
         self.quotes.clear()
         self.condition_codes.clear()
+        self._code_sources.clear()
         self._tr_queue.clear()
         self._name_queue.clear()
         self._realtime_registered = False
@@ -121,6 +141,7 @@ class ConditionStockScanner:
             for i, cond in enumerate(runtime):
                 screen = f"{base_screen + i:04d}"
                 loaded = self._load_condition_codes(cond.index, cond.name, screen)
+                self._tag_codes(cond.name, loaded)
                 logger.info("condition [%s] screen=%s -> %d codes", cond.name, screen, len(loaded))
                 codes.extend(loaded)
                 self._active_conditions.append((screen, cond))
@@ -176,6 +197,7 @@ class ConditionStockScanner:
                     continue
                 if nc not in self.quotes:
                     new_codes.append(nc)
+                self._tag_codes(cond.name, [nc])
                 self._ensure_stock(nc, fetch_tr=False)
         if new_codes:
             self._register_realtime(new_codes, replace=False)
@@ -370,6 +392,7 @@ class ConditionStockScanner:
             return
         was_new = code not in self.quotes
         logger.info("real condition insert: %s (%s) new=%s", code, cond_name, was_new)
+        self._tag_codes(cond_name, [code])
         self._ensure_stock(code, fetch_tr=False)
         if was_new:
             self._register_realtime([code], replace=False)

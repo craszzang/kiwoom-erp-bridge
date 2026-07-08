@@ -34,11 +34,13 @@ from PyQt5.QtWidgets import (
 )
 
 from auto_trader import i18n_ko as T
-from auto_trader.auto_conditions import resolve_conditions
+from auto_trader.auto_conditions import resolve_conditions, resolve_parallel_conditions
 from auto_trader.auto_log import setup_auto_logging
 from auto_trader.auto_loop import finalize_session, prepare_session
 from auto_trader.brm_runner import BrmPaperRunner
 from auto_trader.daily_runner import DailyRunner
+from auto_trader.lane_session import finalize_parallel_session, prepare_parallel_lanes
+from auto_trader.parallel_runner import ParallelDailyRunner
 from auto_trader.condition_picker import ConditionChoice, pick_conditions
 from auto_trader.config import TraderConfig, load_config, save_config
 from auto_trader.filter_dialog import edit_filters
@@ -111,6 +113,8 @@ class ExcelDisguiseWindow(QMainWindow):
         self._grid_refresh_timer.timeout.connect(self._apply_scanner_update)
         self._brm_runner: BrmPaperRunner | None = None
         self._daily_runner: DailyRunner | None = None
+        self._parallel_runner: ParallelDailyRunner | None = None
+        self._parallel_lanes = []
         self._auto_log_path: Path | None = None
         self._session_timer = QTimer(self)
         self._session_timer.setInterval(30_000)
@@ -128,6 +132,8 @@ class ExcelDisguiseWindow(QMainWindow):
                 rev_id = prepare_session(self.config)
                 save_config(self.config)
                 logger.info("strategy loaded: %s", rev_id)
+            if self._use_parallel_lanes():
+                logger.info("parallel lane mode ON")
 
         self.setWindowTitle(T.WIN_TITLE)
         self.resize(1680, 800)
@@ -261,10 +267,34 @@ class ExcelDisguiseWindow(QMainWindow):
         lay.addStretch()
         return bar
 
-    def _trading_runner(self) -> BrmPaperRunner | DailyRunner | None:
+    def _use_parallel_lanes(self) -> bool:
+        sa = getattr(self.config, "strategy_auto", None)
+        return bool(
+            self.config.daily.enabled
+            and self._auto_mode
+            and sa
+            and getattr(sa, "parallel_lanes", True)
+        )
+
+    def _trading_runner(self) -> BrmPaperRunner | DailyRunner | ParallelDailyRunner | None:
+        if self._use_parallel_lanes():
+            return self._parallel_runner
         if self.config.daily.enabled:
             return self._daily_runner
         return self._brm_runner
+
+    def _ensure_parallel_runner(self) -> ParallelDailyRunner | None:
+        if not self.api or not self.scanner or self._remote_mode:
+            return None
+        if self._parallel_runner is None and self._parallel_lanes:
+            self._parallel_runner = ParallelDailyRunner(
+                api=self.api,
+                config=self.config,
+                scanner=self.scanner,
+                lanes=self._parallel_lanes,
+                on_update=self._on_trading_status,
+            )
+        return self._parallel_runner
 
     def _ensure_daily_runner(self) -> DailyRunner | None:
         if not self.api or not self.scanner or self._remote_mode:
@@ -868,7 +898,10 @@ class ExcelDisguiseWindow(QMainWindow):
             if self._trading_runner():
                 cond_names = [c.name for c in self._selected_conditions]
                 try:
-                    finalize_session(self.config, self._trading_runner(), cond_names)
+                    if self._use_parallel_lanes() and self._parallel_runner:
+                        finalize_parallel_session(self.config, self._parallel_runner, cond_names)
+                    else:
+                        finalize_session(self.config, self._trading_runner(), cond_names)
                 except Exception as exc:
                     logger.exception("finalize_session failed: %s", exc)
                 runner = self._trading_runner()
@@ -889,6 +922,12 @@ class ExcelDisguiseWindow(QMainWindow):
             logger.warning("condition refresh failed: %s", exc)
 
     def _start_trading_if_configured(self) -> None:
+        if self.config.daily.enabled and self._use_parallel_lanes():
+            runner = self._ensure_parallel_runner()
+            if runner and not runner.active:
+                runner.start()
+                self._status.showMessage(runner.status_text(), 6000)
+            return
         if self.config.daily.enabled:
             runner = self._ensure_daily_runner()
             if runner and not runner.active:
@@ -911,7 +950,16 @@ class ExcelDisguiseWindow(QMainWindow):
             return []
         auto = self.config.automation
         if self._auto_mode and auto.skip_condition_dialog:
-            selected = resolve_conditions(self.api, self.config)
+            if self._use_parallel_lanes():
+                selected = resolve_parallel_conditions(self.api, self.config)
+                if selected:
+                    self._parallel_lanes = prepare_parallel_lanes(self.config, selected)
+                    logger.info(
+                        "parallel lanes: %s",
+                        [(lv.condition_name, lv.version_id) for lv in self._parallel_lanes],
+                    )
+            else:
+                selected = resolve_conditions(self.api, self.config)
             if selected:
                 save_config(self.config)
             return selected

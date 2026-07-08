@@ -27,6 +27,8 @@ class StrategyAutoConfig:
 
     enabled: bool = True
     auto_evolve: bool = True
+    parallel_lanes: bool = True
+    max_parallel_conditions: int = 8
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any] | None) -> "StrategyAutoConfig":

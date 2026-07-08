@@ -62,6 +62,8 @@ automation:
 strategy_auto:
   enabled: true
   auto_evolve: true
+  parallel_lanes: true
+  max_parallel_conditions: 8
 
 bridge:
   role: host

@@ -55,6 +55,8 @@ class DailyEngine:
     book: BrmPaperBook = field(default_factory=BrmPaperBook)
     _peaks: dict[str, float] = field(default_factory=dict)
     _log_path: Path | None = None
+    lane_version_id: str = ""
+    condition_name: str = ""
 
     def _in_session(self, now: datetime) -> bool:
         t = now.time()
@@ -157,21 +159,46 @@ class DailyEngine:
     def _log(self, sig: DailySignal, now: datetime) -> None:
         if not self.params.log_signals:
             return
-        log_dir = Path(__file__).resolve().parent.parent / "logs"
+        root = Path(__file__).resolve().parent.parent / "logs"
+        if self.lane_version_id:
+            safe = self.lane_version_id.lstrip(".").replace(".", "_")
+            log_dir = root / "lanes" / safe
+        else:
+            log_dir = root
         log_dir.mkdir(parents=True, exist_ok=True)
         if self._log_path is None or self._log_path.name != f"daily_{now:%Y%m%d}.csv":
             self._log_path = log_dir / f"daily_{now:%Y%m%d}.csv"
             if not self._log_path.exists():
                 with self._log_path.open("w", newline="", encoding="utf-8-sig") as f:
                     csv.writer(f).writerow(
-                        ["time", "code", "name", "action", "price", "qty", "reason", "sell_pct", "strength", "peak"]
+                        [
+                            "time", "lane", "condition", "code", "name", "action",
+                            "price", "qty", "reason", "sell_pct", "strength", "peak",
+                        ]
                     )
         with self._log_path.open("a", newline="", encoding="utf-8-sig") as f:
             csv.writer(f).writerow(
                 [
-                    now.strftime("%H:%M:%S"), sig.code, sig.name, sig.action.value,
-                    f"{sig.price:.0f}", sig.qty, sig.reason,
-                    f"{sig.sell_pct:.1f}", f"{sig.strength:.1f}", f"{sig.peak:.0f}",
+                    now.strftime("%H:%M:%S"),
+                    self.lane_version_id,
+                    self.condition_name,
+                    sig.code,
+                    sig.name,
+                    sig.action.value,
+                    f"{sig.price:.0f}",
+                    sig.qty,
+                    sig.reason,
+                    f"{sig.sell_pct:.1f}",
+                    f"{sig.strength:.1f}",
+                    f"{sig.peak:.0f}",
                 ]
             )
-        logger.info("DAILY %s %s %s @%s %s", sig.action.value, sig.code, sig.name, sig.price, sig.reason)
+        logger.info(
+            "DAILY %s %s %s %s @%s %s",
+            self.lane_version_id or "-",
+            sig.action.value,
+            sig.code,
+            sig.name,
+            sig.price,
+            sig.reason,
+        )

@@ -65,3 +65,45 @@ def resolve_conditions(api: KiwoomAPI, config: TraderConfig) -> list[ConditionCh
         return [all_conds[0]]
 
     return []
+
+
+def resolve_parallel_conditions(api: KiwoomAPI, config: TraderConfig) -> list[ConditionChoice]:
+    """Return all HTS conditions matching automation keywords (parallel lanes)."""
+    auto: AutomationConfig = config.automation
+    try:
+        all_conds = load_conditions_from_api(api)
+    except Exception as exc:
+        logger.error("condition load failed: %s", exc)
+        return []
+
+    if not all_conds:
+        logger.warning("no saved Kiwoom conditions — use HTS to create one")
+        return []
+
+    if auto.condition_names:
+        want = [n.strip() for n in auto.condition_names if n.strip()]
+        want_set = set(want)
+        exact = [c for c in all_conds if c.name in want_set]
+        if exact:
+            logger.info("parallel conditions exact: %s", [c.name for c in exact])
+            return exact
+        matched: list[ConditionChoice] = []
+        seen: set[str] = set()
+        for c in all_conds:
+            if any(w in c.name for w in want) and c.name not in seen:
+                matched.append(c)
+                seen.add(c.name)
+        if matched:
+            logger.info("parallel conditions keyword: %s", [c.name for c in matched])
+            return matched
+
+    if auto.condition_indices:
+        idx_set = {int(i) for i in auto.condition_indices}
+        picked = [c for c in all_conds if c.index in idx_set]
+        if picked:
+            return picked
+
+    if auto.use_first_condition:
+        return [all_conds[0]]
+
+    return all_conds[: min(8, len(all_conds))]

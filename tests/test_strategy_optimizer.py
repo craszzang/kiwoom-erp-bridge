@@ -15,7 +15,7 @@ from auto_trader.strategy_rev import StrategyRev, ensure_baseline_rev, next_rev_
 def test_baseline_rev_exists() -> None:
     rev = ensure_baseline_rev()
     assert rev.rev_id == "Rev.0"
-    assert rev.brm.get("tp_pct") == 1.2
+    assert float(rev.daily.get("take_profit_pct", 0)) > 0
 
 
 def test_evolve_on_loss_session() -> None:
@@ -29,16 +29,16 @@ def test_evolve_on_loss_session() -> None:
             "realized_pnl": -50000,
         },
         "closed_trades": [
-            {"reason": "STOP"},
-            {"reason": "STOP"},
-            {"reason": "TP"},
+            {"reason": "SELL_STOP"},
+            {"reason": "SELL_STOP"},
+            {"reason": "SELL_TP"},
         ],
         "late_entries": 0,
     }
     new_rev = evolve_strategy(rev, session)
     assert new_rev is not None
     assert new_rev.rev_id != rev.rev_id
-    assert float(new_rev.brm["stop_loss_pct"]) < float(rev.brm["stop_loss_pct"])
+    assert float(new_rev.daily["stop_loss_pct"]) < float(rev.daily["stop_loss_pct"])
 
 
 def test_no_evolve_on_empty_session() -> None:

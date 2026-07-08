@@ -27,3 +27,6 @@ jobs:
 
       - name: Strategy optimizer tests
         run: python tests/test_strategy_optimizer.py
+
+      - name: Lane version tests
+        run: python tests/test_lane_version.py
