@@ -28,9 +28,11 @@ def test_version_id_format() -> None:
 
 
 def test_next_version_increments() -> None:
-    cond = "테스트조건"
+    # Unique condition name per run → isolated from leftover lane files.
+    cond = f"테스트조건_{int(datetime.now().timestamp())}"
     d = datetime(2026, 7, 8)
     v1 = next_version_for_date(cond, d)
+    assert v1 == ".260708_ver.1"
     lv = LaneVersion(
         version_id=v1,
         condition_name=cond,
