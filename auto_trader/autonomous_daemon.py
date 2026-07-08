@@ -28,6 +28,7 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 PY = ROOT / ".venv32" / "Scripts" / "python.exe"
+HEADLESS_MAIN = ROOT / "auto_trader" / "headless_main.py"
 EXCEL_MAIN = ROOT / "auto_trader" / "excel_main.py"
 START_HM = (8, 45)
 SESSION_END_HM = (15, 25)
@@ -78,8 +79,11 @@ def _run_trading_session() -> int:
     env = dict(**__import__("os").environ)
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    use_headless = bool(getattr(cfg.automation, "headless", True))
+    entry = HEADLESS_MAIN if use_headless and HEADLESS_MAIN.is_file() else EXCEL_MAIN
+    logger.info("session entry: %s (headless=%s)", entry.name, use_headless)
     proc = subprocess.run(
-        [py, "-X", "utf8", str(EXCEL_MAIN), "--auto"],
+        [py, "-X", "utf8", str(entry), "--auto"],
         cwd=r"C:\OpenAPI",
         env=env,
     )

@@ -49,7 +49,7 @@ automation:
   skip_condition_dialog: true
   condition_names: []
   condition_indices: []
-  use_first_condition: true
+  use_first_condition: false
   auto_brm: true
   session_start: "08:50"
   session_end: "11:05"
@@ -58,12 +58,13 @@ automation:
   login_retry_sec: 20
   refresh_conditions_min: 5
   skip_account_password_dialog: true
+  headless: true
 
 strategy_auto:
   enabled: true
   auto_evolve: true
   parallel_lanes: true
-  max_parallel_conditions: 8
+  max_parallel_conditions: 20
 
 bridge:
   role: host

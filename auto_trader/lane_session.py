@@ -109,6 +109,15 @@ def finalize_parallel_session(
             tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
             set_active_lanes(tomorrow_map, tomorrow)
 
+    if runner and sessions:
+        try:
+            from auto_trader.lane_strategy_brief import write_daily_strategy_brief
+
+            lanes_list = list(lane_versions.values())
+            write_daily_strategy_brief(runner, lanes_list)
+        except Exception as exc:
+            logger.warning("strategy brief failed: %s", exc)
+
     tg_cfg = load_telegram_config()
     if tg_cfg.enabled and sessions:
         msg = _format_parallel_telegram(sessions, ranked, next_lanes)

@@ -103,7 +103,6 @@ def resolve_parallel_conditions(api: KiwoomAPI, config: TraderConfig) -> list[Co
         if picked:
             return picked
 
-    if auto.use_first_condition:
-        return [all_conds[0]]
-
-    return all_conds[: min(8, len(all_conds))]
+    # No name/index filter → use ALL saved Catch conditions in parallel.
+    logger.info("parallel conditions ALL: %s", [c.name for c in all_conds])
+    return list(all_conds)

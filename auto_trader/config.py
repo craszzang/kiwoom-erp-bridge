@@ -69,6 +69,7 @@ class AutomationConfig:
     login_retry_sec: int = 15
     refresh_conditions_min: int = 5
     skip_account_password_dialog: bool = True
+    headless: bool = False
 
     @classmethod
     def from_dict(cls, raw: dict[str, Any] | None) -> "AutomationConfig":
